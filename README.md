@@ -163,10 +163,6 @@ Logs are saved in the script directory with the naming pattern: `PhotoUpdate_YYY
    - Ensure sender email address is valid
    - Verify recipient email address is correct
 
-## License
-
-This script is provided as-is without any warranty. Use at your own risk.
-
 ## Email Notifications
 
 If enabled, sends an HTML-formatted email with:
