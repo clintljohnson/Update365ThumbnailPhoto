@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update365ThumbnailPhotos Documentation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1012px;
+            margin: 0 auto;
+            padding: 2rem;
+            color: #24292e;
+        }
+        
+        h1, h2, h3 {
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+            margin-top: 24px;
+            margin-bottom: 16px;
+        }
+        
+        code {
+            background-color: rgba(27, 31, 35, 0.05);
+            border-radius: 3px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 85%;
+            padding: 0.2em 0.4em;
+        }
+        
+        pre {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 16px;
+            overflow: auto;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1em;
+        }
+        
+        th, td {
+            border: 1px solid #dfe2e5;
+            padding: 6px 13px;
+            text-align: left;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f6f8fa;
+        }
+        
+        ul {
+            padding-left: 2em;
+        }
+        
+        .note {
+            font-size: 0.9em;
+            color: #6a737d;
+            margin-top: 0.5em;
+        }
+        
+        .emoji {
+            font-family: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        }
+    </style>
+</head>
+<body>
+    <h1>Update365ThumbnailPhotos</h1>
+    
+    <p>A PowerShell script that synchronizes user thumbnail photos from Active Directory to Microsoft 365 services (SharePoint, Exchange Online, and Teams). The script provides both a dry-run mode for testing and a force mode for actual updates.</p>
+    
+    <h2>Overview</h2>
+    
+    <p>This script addresses a common limitation in Microsoft 365 synchronization: while the <code>thumbnailPhoto</code> attribute is initially synced from on-premises Active Directory to Exchange Online, subsequent changes to this attribute don't automatically sync. This script provides an automated solution to keep user photos synchronized across your Microsoft 365 environment.</p>
+    
+    <h2>Prerequisites</h2>
+    
+    <h3>Required PowerShell Modules</h3>
+    <ul>
+        <li><strong>ActiveDirectory</strong>: For accessing on-premises AD</li>
+        <li><strong>Microsoft.Graph</strong>: For Microsoft 365 operations (minimum version 2.26.1)</li>
+        <li><strong>PSSQLite</strong> (Optional): For photo change tracking</li>
+    </ul>
+    
+    <h3>Azure AD App Registration</h3>
+    <ol>
+        <li>An Azure AD application registration with the following:
+            <ul>
+                <li>API Permissions: <code>ProfilePhoto.ReadWrite.All</code> (Application permission)</li>
+                <li>A valid client secret</li>
+                <li>The application must be granted admin consent for the permissions</li>
+            </ul>
+        </li>
+    </ol>
+    
+    <h2>Installation</h2>
+    
+    <ol>
+        <li>Clone or download the script to your desired location</li>
+        <li>Ensure all required PowerShell modules are installed:</li>
+    </ol>
+    
+    <pre><code>Install-Module -Name Microsoft.Graph -Force
+Install-Module -Name ActiveDirectory -Force
+Install-Module -Name PSSQLite -Force  # Optional, for change tracking</code></pre>
+    
+    <h2>Client Secret Management</h2>
+    
+    <h3>When Creating/Updating Client Secret</h3>
+    
+    <p>When your client secret expires (maximum duration is 2 years) or when setting up the script for the first time, run the script with the <code>-SaveCredentials</code> parameter:</p>
+    
+    <pre><code>.\Update365ThumbnailPhotos.ps1 `
+    -OrganizationalUnit "OU=Whoville,DC=CONTOSO,DC=COM" `
+    -Force `
+    -TenantId '917dd6ff-2b18-43c4-95fa-1bcf78e31ea2' `
+    -ClientId '891296c1-5e3f-9ef2-ebf2-5e2f649f12c1' `
+    -ClientSecret 'Apo8Q~q3RieMEyWC5KXvfe2ZeQ4SbNmtXiY8jchh' `
+    -SaveCredentials</code></pre>
+    
+    <p>This will save the credentials to <code>Update365ThumbnailPhotos.config</code> in the script directory.</p>
+    
+    <h3>Regular Usage</h3>
+    
+    <p>Once credentials are saved, you can run the script without providing the authentication parameters:</p>
+    
+    <pre><code>.\Update365ThumbnailPhotos.ps1 `
+    -OrganizationalUnit "OU=Whoville,DC=CONTOSO,DC=COM" `
+    -Force</code></pre>
+    
+    <h2>Features</h2>
+    
+    <ul>
+        <li><strong>Dry Run Mode</strong>: Test changes without applying them (omit <code>-Force</code> parameter)</li>
+        <li><strong>Force Mode</strong>: Apply actual changes to Microsoft 365 (use <code>-Force</code> parameter)</li>
+        <li><strong>Photo Change Tracking</strong>: Tracks which photos have been updated (requires PSSQLite module)</li>
+        <li><strong>Detailed Logging</strong>: HTML-formatted logs with color-coded status messages</li>
+        <li><strong>Credential Storage</strong>: Secure storage of app registration credentials</li>
+        <li><strong>Selective Updates</strong>: Update specific users or organizational units</li>
+        <li><strong>Email Notifications</strong>: Optional email notifications of successful updates</li>
+    </ul>
+    
+    <h2>Parameters</h2>
+    
+    <table>
+        <tr>
+            <th>Parameter</th>
+            <th>Required</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>OrganizationalUnit</td>
+            <td>Yes*</td>
+            <td>Distinguished name of the OU containing users to update</td>
+        </tr>
+        <tr>
+            <td>SamAccountName</td>
+            <td>Yes*</td>
+            <td>Specific user account to update</td>
+        </tr>
+        <tr>
+            <td>Domain</td>
+            <td>No</td>
+            <td>Domain name (default: CONTOSO.COM)</td>
+        </tr>
+        <tr>
+            <td>LogFile</td>
+            <td>No</td>
+            <td>Path to log file (default: .\PhotoUpdate_timestamp.html)</td>
+        </tr>
+        <tr>
+            <td>PlainTextLog</td>
+            <td>No</td>
+            <td>Use plain text logging instead of HTML</td>
+        </tr>
+        <tr>
+            <td>Force</td>
+            <td>No</td>
+            <td>Apply changes instead of dry run</td>
+        </tr>
+        <tr>
+            <td>TenantId</td>
+            <td>No**</td>
+            <td>Azure AD tenant ID</td>
+        </tr>
+        <tr>
+            <td>ClientId</td>
+            <td>No**</td>
+            <td>Azure AD application ID</td>
+        </tr>
+        <tr>
+            <td>ClientSecret</td>
+            <td>No**</td>
+            <td>Azure AD application secret</td>
+        </tr>
+        <tr>
+            <td>SaveCredentials</td>
+            <td>No</td>
+            <td>Save provided credentials for future use</td>
+        </tr>
+        <tr>
+            <td>EmailResults</td>
+            <td>No</td>
+            <td>Send email with update results</td>
+        </tr>
+        <tr>
+            <td>EmailFrom</td>
+            <td>Yes***</td>
+            <td>Sender email address</td>
+        </tr>
+        <tr>
+            <td>EmailTo</td>
+            <td>Yes***</td>
+            <td>Recipient email address(es) - multiple addresses can be specified, separated by commas</td>
+        </tr>
+        <tr>
+            <td>EmailSubject</td>
+            <td>No</td>
+            <td>Email subject (default: Microsoft 365 Photo Update Results)</td>
+        </tr>
+        <tr>
+            <td>EmailRelay</td>
+            <td>No</td>
+            <td>SMTP relay server (default: smtp.office365.com)</td>
+        </tr>
+        <tr>
+            <td>EmailRelayPort</td>
+            <td>No</td>
+            <td>SMTP relay port (default: 25)</td>
+        </tr>
+    </table>
+    
+    <p class="note">* Either OrganizationalUnit or SamAccountName must be specified, but not both<br>
+    ** Required only when credentials haven't been saved previously<br>
+    *** Required when -EmailResults is used</p>
+    
+    <h2>How It Works</h2>
+    
+    <ol>
+        <li><strong>Authentication</strong>: The script authenticates to Microsoft Graph using client credentials flow:
+            <pre><code>Connect-MgGraph -TenantId $TenantId -ClientSecretCredential $credential</code></pre>
+        </li>
+        <li><strong>User Discovery</strong>: Retrieves users with thumbnail photos from Active Directory:
+            <pre><code>$users = Get-ADUser -SearchBase $OrganizationalUnit -Filter * -Properties thumbnailPhoto, mail</code></pre>
+        </li>
+        <li><strong>Photo Synchronization</strong>: For each user:
+            <ul>
+                <li>Checks if the photo has changed (if using PSSQLite)</li>
+                <li>Creates a temporary file with the photo data</li>
+                <li>Updates the photo in Microsoft 365 using Microsoft Graph</li>
+                <li>Saves a copy in the Images folder</li>
+                <li>Updates the tracking database (if using PSSQLite)</li>
+            </ul>
+        </li>
+        <li><strong>Email Notifications</strong>: If enabled, sends an HTML-formatted email with:
+            <ul>
+                <li>List of successfully updated users</li>
+                <li>User display names and email addresses</li>
+                <li>Photo sizes</li>
+                <li>Total count of updates</li>
+            </ul>
+        </li>
+    </ol>
+    
+    <h2>Email Notifications</h2>
+    
+    <p>If enabled, sends an HTML-formatted email with:</p>
+    <ul>
+        <li>List of successfully updated users</li>
+        <li>User display names and email addresses</li>
+        <li>Photo sizes</li>
+        <li>Total count of updates</li>
+    </ul>
+    
+    <p>Multiple recipients can be specified by separating email addresses with commas in the <code>-EmailTo</code> parameter:</p>
+    
+    <pre><code>.\Update365ThumbnailPhotos.ps1 `
+    -OrganizationalUnit "OU=Whoville,DC=CONTOSO,DC=COM" `
+    -Force `
+    -EmailResults `
+    -EmailFrom "photosync@contoso.com" `
+    -EmailTo "admin@contoso.com,helpdesk@contoso.com" `
+    -EmailSubject "Daily Office 365 Photo Synchronization" `
+    -EmailRelay "smtp.contoso.com"</code></pre>
+    
+    <h2>Logging</h2>
+    
+    <p>The script creates detailed logs in HTML format (by default) with color-coded status messages:</p>
+    <ul>
+        <li><span class="emoji" style="color: #22863a;">🟢</span> Success: Green</li>
+        <li><span class="emoji" style="color: #cb2431;">🔴</span> Error: Red</li>
+        <li><span class="emoji" style="color: #f66a0a;">🟡</span> Warning: Yellow</li>
+        <li><span class="emoji" style="color: #6a737d;">⚪</span> Info: White</li>
+        <li><span class="emoji" style="color: #0366d6;">🔵</span> Current: Cyan</li>
+    </ul>
+    
+    <p>Logs are saved in the script directory with the naming pattern: <code>PhotoUpdate_YYYYMMDD_HHMMSS.html</code></p>
+    
+    <h2>Best Practices</h2>
+    
+    <ol>
+        <li>Always run in dry-run mode first (without <code>-Force</code>)</li>
+        <li>Review the generated logs for any potential issues</li>
+        <li>Keep track of when your client secret expires (maximum 2 years)</li>
+        <li>Regularly backup the credentials configuration file</li>
+        <li>Monitor the size of the SQLite database if using photo change tracking</li>
+        <li>When using email notifications, ensure your SMTP relay is properly configured</li>
+        <li>Test email functionality with a small set of users first</li>
+    </ol>
+    
+    <h2>Troubleshooting</h2>
+    
+    <h3>Common Issues</h3>
+    
+    <ol>
+        <li><strong>Authentication Errors</strong>
+            <ul>
+                <li>Verify app registration permissions</li>
+                <li>Ensure admin consent has been granted</li>
+                <li>Check if client secret has expired</li>
+            </ul>
+        </li>
+        <li><strong>Photo Update Failures</strong>
+            <ul>
+                <li>Verify photo size (should be less than 100KB)</li>
+                <li>Check user's email address in Active Directory</li>
+                <li>Ensure photo is in a compatible format (JPEG recommended)</li>
+            </ul>
+        </li>
+        <li><strong>Module-Related Errors</strong>
+            <ul>
+                <li>Update Microsoft.Graph module to latest version</li>
+                <li>Ensure all required modules are installed</li>
+                <li>Check PowerShell execution policy</li>
+            </ul>
+        </li>
+        <li><strong>Email Delivery Issues</strong>
+            <ul>
+                <li>Verify SMTP relay server is accessible</li>
+                <li>Check if port 25 is open (or specified port)</li>
+                <li>Ensure sender email address is valid</li>
+                <li>Verify recipient email address is correct</li>
+            </ul>
+        </li>
+    </ol>
+    
+    <h2>License</h2>
+    
+    <p>This script is provided as-is without any warranty. Use at your own risk.</p>
+</body>
+</html>
