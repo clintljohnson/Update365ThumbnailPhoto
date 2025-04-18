@@ -179,7 +179,7 @@ Multiple recipients can be specified by separating email addresses with commas i
 
 ```powershell
 .\Update365ThumbnailPhotos.ps1 `
-    -OrganizationalUnit "OU=Whoville,OU=Jackson,DC=CONTOSO,DC=COM" `
+    -OrganizationalUnit "OU=Whoville,DC=CONTOSO,DC=COM" `
     -Force `
     -EmailResults `
     -EmailFrom "photosync@contoso.com" `
